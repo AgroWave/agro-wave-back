@@ -1,0 +1,28 @@
+[importlinter]
+root_package = agrowave
+include_external_packages = True
+
+[importlinter:contract:clean-architecture-layers]
+name = Clean Architecture Layers
+type = layers
+layers =
+    presentation
+    infrastructure
+    application
+    domain
+containers =
+    agrowave.shared
+
+[importlinter:contract:forbidden-domain-imports]
+name = Pure Domain (no frameworks or I/O)
+type = forbidden
+source_modules =
+    agrowave.shared.domain
+forbidden_modules =
+    fastapi
+    sqlmodel
+    sqlalchemy
+    boto3
+    botocore
+    pydantic_settings
+    alembic
