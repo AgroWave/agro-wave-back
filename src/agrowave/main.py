@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from fastapi import FastAPI
 
+from agrowave.modules.identity.presentation.routes import router as identity_router
 from agrowave.shared.presentation.health import create_health_router
 
 
@@ -29,6 +30,7 @@ def create_app(db_probe: Callable[[], bool] | None = None) -> FastAPI:
     probe = db_probe or (lambda: True)
     health_router = create_health_router(probe)
     app.include_router(health_router, prefix="/api/v1")
+    app.include_router(identity_router, prefix="/api/v1")
 
     return app
 

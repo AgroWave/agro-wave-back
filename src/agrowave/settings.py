@@ -28,3 +28,12 @@ class Settings(BaseSettings):
     s3_access_key: SecretStr
     s3_secret_key: SecretStr
     s3_region: str = "us-east-1"
+    jwt_secret_key: SecretStr = SecretStr(
+        "development-jwt-secret-key-change-in-production-min-32-chars"
+    )
+    jwt_algorithm: str = "HS256"
+
+
+def get_settings() -> Settings:
+    """Returns cached application settings instance."""
+    return Settings()

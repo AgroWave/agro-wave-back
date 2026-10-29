@@ -12,12 +12,14 @@ layers =
     domain
 containers =
     agrowave.shared
+    agrowave.modules.identity
 
 [importlinter:contract:forbidden-domain-imports]
 name = Pure Domain (no frameworks or I/O)
 type = forbidden
 source_modules =
     agrowave.shared.domain
+    agrowave.modules.identity.domain
 forbidden_modules =
     fastapi
     sqlmodel
