@@ -6,6 +6,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
+import agrowave.modules.identity.infrastructure.row_models  # noqa: F401
+import agrowave.modules.profiles.infrastructure.row_models  # noqa: F401
 from agrowave.settings import Settings
 
 config = context.config
