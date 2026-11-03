@@ -9,6 +9,7 @@ from sqlmodel import SQLModel, create_engine
 
 from agrowave.main import create_app
 from agrowave.modules.identity.presentation.dependencies import get_identity_engine
+from agrowave.modules.profiles.presentation.dependencies import get_profiles_engine
 
 
 @pytest.fixture
@@ -28,6 +29,7 @@ def client(api_engine) -> Iterator[TestClient]:
     """Provides a TestClient wired to the in-memory engine."""
     app = create_app()
     app.dependency_overrides[get_identity_engine] = lambda: api_engine
+    app.dependency_overrides[get_profiles_engine] = lambda: api_engine
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
