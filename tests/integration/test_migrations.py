@@ -93,3 +93,29 @@ def test_ac03_12_terrain_migrations_clean(empty_test_database: str) -> None:
     assert tables == {
         "terrain_dem",
     }, "terrain migrations must create the terrain tables"
+
+
+def test_ac04_02_scenarios_migrations_clean(empty_test_database: str) -> None:
+    """AC-04-02: Alembic migrations apply cleanly and create scenarios tables without diffs."""
+    config = _alembic_config(empty_test_database)
+
+    command.upgrade(config, "head")
+    command.check(config)
+
+    engine = create_engine(empty_test_database)
+    with engine.connect() as connection:
+        tables = set(
+            connection.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_name LIKE 'scenarios_%'"
+                )
+            ).scalars()
+        )
+    engine.dispose()
+    assert tables == {
+        "scenarios_scenario",
+        "scenarios_access_node",
+        "scenarios_end_node",
+        "scenarios_link",
+    }, "scenarios migrations must create the scenarios tables"

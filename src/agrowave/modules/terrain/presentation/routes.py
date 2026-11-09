@@ -248,4 +248,3 @@ def delete_dem(
             status_code=status.HTTP_409_CONFLICT,
             content=_format_error("ResourceInUse", str(exc)),
         )
-

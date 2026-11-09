@@ -1,0 +1,1 @@
+"""Scenarios bounded context module."""

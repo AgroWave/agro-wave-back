@@ -23,4 +23,3 @@ class DemNotFoundError(TerrainDomainError):
 
 class ResourceInUseError(TerrainDomainError):
     """Raised when attempting to delete a DEM that is in use by scenarios (RN-28)."""
-

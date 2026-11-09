@@ -18,4 +18,3 @@ class NoScenariosDemUsageQuery(DemUsageQuery):
             False, as no scenarios exist yet (stubbed for INC-03).
         """
         return False
-

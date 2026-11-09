@@ -64,4 +64,3 @@ class DeleteDem:
             self._object_store.delete_file(dem.object_key)
 
         self._repo.delete(cmd.dem_id)
-

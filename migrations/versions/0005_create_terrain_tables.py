@@ -55,4 +55,3 @@ def downgrade() -> None:
     op.drop_index("ix_terrain_dem_status", table_name="terrain_dem")
     op.drop_index("ix_terrain_dem_owner_id", table_name="terrain_dem")
     op.drop_table("terrain_dem")
-

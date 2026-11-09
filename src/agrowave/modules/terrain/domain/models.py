@@ -136,4 +136,3 @@ class Dem:
             self.created_at = now
         if self.updated_at is None:
             self.updated_at = now
-

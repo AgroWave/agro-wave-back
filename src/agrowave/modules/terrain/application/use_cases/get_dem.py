@@ -44,4 +44,3 @@ class GetDem:
         if dem is None or dem.owner_id != query.user_id:
             raise DemNotFoundError(f"DEM '{query.dem_id}' not found.")
         return dem
-

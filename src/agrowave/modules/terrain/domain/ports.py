@@ -76,4 +76,3 @@ class DemUsageQuery(ABC):
     @abstractmethod
     def is_dem_in_use(self, dem_id: UUID) -> bool:
         """Returns True if any scenario is currently assigned to this DEM."""
-

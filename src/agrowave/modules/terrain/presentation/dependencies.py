@@ -7,6 +7,11 @@ import boto3
 from fastapi import Depends
 from sqlalchemy.engine import Engine
 
+from agrowave.modules.scenarios.infrastructure.adapters import ScenariosDemUsageQuery
+from agrowave.modules.scenarios.infrastructure.sqlmodel_scenario_repository import (
+    SqlModelScenarioRepository,
+)
+from agrowave.modules.scenarios.public import ScenariosService
 from agrowave.modules.terrain.domain.ports import (
     DemObjectStore,
     DemRepository,
@@ -19,9 +24,6 @@ from agrowave.modules.terrain.infrastructure.colombia_territory_boundary import 
 )
 from agrowave.modules.terrain.infrastructure.fabdem_elevation_source import (
     FabdemElevationSource,
-)
-from agrowave.modules.terrain.infrastructure.no_scenarios_dem_usage_query import (
-    NoScenariosDemUsageQuery,
 )
 from agrowave.modules.terrain.infrastructure.s3_dem_object_store import S3DemObjectStore
 from agrowave.modules.terrain.infrastructure.sqlmodel_dem_repository import (
@@ -69,6 +71,9 @@ def get_dem_object_store(
     return S3DemObjectStore(s3_client=s3_client, bucket_name=settings.s3_bucket_dems)
 
 
-def get_dem_usage_query() -> DemUsageQuery:
-    """Provides the DEM usage checker (RN-28)."""
-    return NoScenariosDemUsageQuery()
+def get_dem_usage_query(
+    engine: Engine = Depends(get_terrain_engine),
+) -> DemUsageQuery:
+    """Provides the DEM usage checker backed by ScenariosService (RN-28)."""
+    scenario_repo = SqlModelScenarioRepository(engine)
+    return ScenariosDemUsageQuery(ScenariosService(scenario_repo))

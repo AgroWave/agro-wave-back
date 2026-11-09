@@ -76,4 +76,3 @@ class RequestDemDownload:
         )
         self._repo.save(dem)
         return dem
-
