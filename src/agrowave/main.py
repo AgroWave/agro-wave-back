@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from agrowave.modules.identity.presentation.routes import router as identity_router
 from agrowave.modules.profiles.presentation.routes import router as profiles_router
+from agrowave.modules.terrain.presentation.routes import router as terrain_router
 from agrowave.shared.presentation.health import create_health_router
 
 
@@ -33,6 +34,7 @@ def create_app(db_probe: Callable[[], bool] | None = None) -> FastAPI:
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(identity_router, prefix="/api/v1")
     app.include_router(profiles_router, prefix="/api/v1")
+    app.include_router(terrain_router, prefix="/api/v1")
 
     return app
 

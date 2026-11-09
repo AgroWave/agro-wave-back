@@ -70,3 +70,26 @@ def test_ac02_09_profiles_migrations_clean(empty_test_database: str) -> None:
         "profiles_profile_band",
         "profiles_node_template",
     }, "profiles migrations must create the profiles tables"
+
+
+def test_ac03_12_terrain_migrations_clean(empty_test_database: str) -> None:
+    """AC-03-12: Alembic migrations apply cleanly and create terrain tables without diffs."""
+    config = _alembic_config(empty_test_database)
+
+    command.upgrade(config, "head")
+    command.check(config)
+
+    engine = create_engine(empty_test_database)
+    with engine.connect() as connection:
+        tables = set(
+            connection.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_name LIKE 'terrain_%'"
+                )
+            ).scalars()
+        )
+    engine.dispose()
+    assert tables == {
+        "terrain_dem",
+    }, "terrain migrations must create the terrain tables"
