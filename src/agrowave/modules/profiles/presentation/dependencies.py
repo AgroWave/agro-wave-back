@@ -9,15 +9,17 @@ from agrowave.modules.profiles.domain.ports import (
     ProfileRepository,
     ProfileUsageQuery,
 )
-from agrowave.modules.profiles.infrastructure.no_scenarios_profile_usage_query import (
-    NoScenariosProfileUsageQuery,
-)
 from agrowave.modules.profiles.infrastructure.sqlmodel_node_template_repository import (
     SqlModelNodeTemplateRepository,
 )
 from agrowave.modules.profiles.infrastructure.sqlmodel_profile_repository import (
     SqlModelProfileRepository,
 )
+from agrowave.modules.scenarios.infrastructure.adapters import ScenariosProfileUsageQuery
+from agrowave.modules.scenarios.infrastructure.sqlmodel_scenario_repository import (
+    SqlModelScenarioRepository,
+)
+from agrowave.modules.scenarios.public import ScenariosService
 from agrowave.settings import get_settings
 
 _engine: Engine | None = None
@@ -59,9 +61,12 @@ def get_node_template_repository(
     return SqlModelNodeTemplateRepository(engine)
 
 
-def get_profile_usage_query() -> ProfileUsageQuery:
-    """Provides ProfileUsageQuery implementation."""
+def get_profile_usage_query(
+    engine: Engine = Depends(get_profiles_engine),
+) -> ProfileUsageQuery:
+    """Provides ProfileUsageQuery implementation backed by ScenariosService."""
     global _usage_query_override
     if _usage_query_override is not None:
         return _usage_query_override
-    return NoScenariosProfileUsageQuery()
+    scenario_repo = SqlModelScenarioRepository(engine)
+    return ScenariosProfileUsageQuery(ScenariosService(scenario_repo))

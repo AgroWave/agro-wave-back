@@ -14,6 +14,8 @@ containers =
     agrowave.shared
     agrowave.modules.identity
     agrowave.modules.profiles
+    agrowave.modules.terrain
+    agrowave.modules.scenarios
 
 [importlinter:contract:forbidden-domain-imports]
 name = Pure Domain (no frameworks or I/O)
@@ -22,6 +24,8 @@ source_modules =
     agrowave.shared.domain
     agrowave.modules.identity.domain
     agrowave.modules.profiles.domain
+    agrowave.modules.terrain.domain
+    agrowave.modules.scenarios.domain
 forbidden_modules =
     fastapi
     sqlmodel

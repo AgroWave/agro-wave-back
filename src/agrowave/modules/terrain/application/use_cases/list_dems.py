@@ -37,4 +37,3 @@ class ListDems:
             List of Dem entities owned by the user.
         """
         return self._repo.list_by_owner(owner_id=query.owner_id, search=query.search)
-

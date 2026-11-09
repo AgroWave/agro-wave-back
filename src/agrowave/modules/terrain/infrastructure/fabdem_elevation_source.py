@@ -61,4 +61,3 @@ class FabdemElevationSource(ElevationSource):
         size_bytes = os.path.getsize(output_cog_path)
         resolution_m = 30.0  # FABDEM nominal resolution is 1 arc-second (~30 m at equator, RN-25)
         return size_bytes, resolution_m
-

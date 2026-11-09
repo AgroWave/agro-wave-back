@@ -67,4 +67,3 @@ def bounds_dimensions_km(bounds: "Bounds") -> tuple[float, float]:
 
     width_km = min(width_south_km, width_north_km)
     return width_km, height_km
-

@@ -115,4 +115,3 @@ class SqlModelDemRepository(DemRepository):
             if row is not None:
                 session.delete(row)
                 session.commit()
-

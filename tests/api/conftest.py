@@ -10,6 +10,7 @@ from sqlmodel import SQLModel, create_engine
 from agrowave.main import create_app
 from agrowave.modules.identity.presentation.dependencies import get_identity_engine
 from agrowave.modules.profiles.presentation.dependencies import get_profiles_engine
+from agrowave.modules.scenarios.presentation.dependencies import get_scenarios_engine
 from agrowave.modules.terrain.presentation.dependencies import get_terrain_engine
 
 
@@ -32,6 +33,7 @@ def client(api_engine) -> Iterator[TestClient]:
     app.dependency_overrides[get_identity_engine] = lambda: api_engine
     app.dependency_overrides[get_profiles_engine] = lambda: api_engine
     app.dependency_overrides[get_terrain_engine] = lambda: api_engine
+    app.dependency_overrides[get_scenarios_engine] = lambda: api_engine
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
