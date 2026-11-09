@@ -9,10 +9,12 @@ dependencies = [
     "argon2-cffi>=23.1",
     "boto3>=1.35",
     "email-validator>=2.0",
+    "fabdem>=0.2.2",
     "fastapi>=0.115",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.6",
     "pyjwt[crypto]>=2.9",
+    "shapely>=2.2.0",
     "sqlmodel>=0.0.22",
     "uvicorn[standard]>=0.32",
 ]
@@ -59,7 +61,18 @@ packages = ["agrowave"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+module = [
+    "boto3",
+    "boto3.*",
+    "botocore",
+    "botocore.*",
+    "fabdem",
+    "fabdem.*",
+    "rasterio",
+    "rasterio.*",
+    "shapely",
+    "shapely.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
