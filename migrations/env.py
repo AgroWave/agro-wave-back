@@ -9,6 +9,7 @@ from sqlmodel import SQLModel
 import agrowave.modules.identity.infrastructure.row_models  # noqa: F401
 import agrowave.modules.profiles.infrastructure.row_models  # noqa: F401
 import agrowave.modules.scenarios.infrastructure.row_models  # noqa: F401
+import agrowave.modules.simulation.infrastructure.row_models  # noqa: F401
 import agrowave.modules.terrain.infrastructure.row_models  # noqa: F401
 from agrowave.settings import Settings
 
