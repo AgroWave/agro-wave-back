@@ -15,6 +15,8 @@ class SimulationSimulationRow(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     owner_id: UUID = Field(
+        foreign_key="identity_user.id",
+        ondelete="CASCADE",
         nullable=False,
         index=True,
     )
@@ -35,6 +37,10 @@ class SimulationSimulationRow(SQLModel, table=True):
     fresnel_clear_count: int | None = Field(default=None, nullable=True)
     fresnel_marginal_count: int | None = Field(default=None, nullable=True)
     fresnel_obstructed_count: int | None = Field(default=None, nullable=True)
+    effective_coverage_area_km2: float | None = Field(default=None, nullable=True)
+    coverage_percentage: float | None = Field(default=None, nullable=True)
+    max_coverage_radius_km: float | None = Field(default=None, nullable=True)
+    variability_index: float | None = Field(default=None, nullable=True)
     failure_reason: str | None = Field(default=None, nullable=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -127,3 +133,28 @@ class SimulationWarningRow(SQLModel, table=True):
     source: str = Field(nullable=False)
     code: str = Field(nullable=False)
     message: str = Field(nullable=False)
+
+
+class SimulationCoverageResultRow(SQLModel, table=True):
+    """Database row model for spatial coverage simulation and DSR metrics (RN-44..49)."""
+
+    __tablename__ = "simulation_coverage_result"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    simulation_id: UUID = Field(
+        foreign_key="simulation_simulation.id",
+        ondelete="CASCADE",
+        nullable=False,
+        index=True,
+    )
+    access_node_id: UUID = Field(nullable=False)
+    effective_coverage_area_km2: float = Field(nullable=False)
+    coverage_percentage: float = Field(nullable=False)
+    max_coverage_radius_km: float = Field(nullable=False)
+    variability_index: float = Field(nullable=False)
+    total_area_km2: float = Field(nullable=False)
+    covered_samples_count: int = Field(nullable=False)
+    total_samples_count: int = Field(nullable=False)
+    samples: list[dict[str, Any]] = Field(
+        sa_column=sa.Column(sa.JSON(), nullable=False),
+    )
