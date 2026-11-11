@@ -95,9 +95,9 @@ class FreeSpacePathLoss:
         Returns:
             Free-space path loss, in dB.
         """
-        distance_km = max(distance_m / 1000.0, 1e-6)
-        freq = max(frequency_mhz, 1e-3)
-        fspl_db = 32.44 + 20.0 * math.log10(freq) + 20.0 * math.log10(distance_km)
+        dist_m = max(distance_m, 1e-3)
+        wn = max(frequency_mhz, 1e-3) / 47.7
+        fspl_db = 8.685890 * math.log(2.0 * wn * dist_m)
         return round(fspl_db, 2)
 
 
@@ -160,23 +160,24 @@ class FresnelAnalyzer:
             los_h_m = z_tx_m + (x_m / total_d_m) * delta_h_m
 
             if 0 < idx < n - 1 and x_m > 0.0 and remain_m > 0.0:
-                d1_slant = x_m * (slant_d_m / total_d_m)
-                d2_slant = remain_m * (slant_d_m / total_d_m)
-                r1_m = math.sqrt((wavelength_m * d1_slant * d2_slant) / slant_d_m)
+                cos_t = total_d_m / slant_d_m
+                r_perp_m = math.sqrt((wavelength_m * x_m * remain_m) / (total_d_m * cos_t))
+                r_vert_m = r_perp_m / cos_t
                 clearance_m = los_h_m - terrain_with_curv_m
-                ratio = clearance_m / r1_m if r1_m > 0.0 else 0.0
+                ratio = clearance_m / r_vert_m if r_vert_m > 0.0 else 0.0
                 if ratio < min_ratio:
                     min_ratio = ratio
                     min_ratio_at_m = x_m
-                if r1_m > max_f1_m:
-                    max_f1_m = r1_m
+                if r_perp_m > max_f1_m:
+                    max_f1_m = r_perp_m
             else:
-                r1_m = 0.0
+                r_perp_m = 0.0
+                r_vert_m = 0.0
 
             dist_list.append(round(x_m, 2))
             terrain_curv_list.append(round(terrain_with_curv_m, 3))
             los_list.append(round(los_h_m, 3))
-            f1_list.append(round(r1_m, 3))
+            f1_list.append(round(r_perp_m, 3))
 
         if min_ratio == float("inf"):
             min_ratio = 1.0
@@ -190,9 +191,9 @@ class FresnelAnalyzer:
             verdict = FresnelVerdict.OBSTRUCTED
 
         analysis = FresnelAnalysis(
-            min_clearance_ratio=round(min_ratio, 3),
+            min_clearance_ratio=round(min_ratio, 2),
             min_clearance_at_m=round(min_ratio_at_m, 2),
-            max_radius_m=round(max_f1_m, 3),
+            max_radius_m=round(max_f1_m, 2),
             verdict=verdict,
         )
         series = ElevationProfileSeries(

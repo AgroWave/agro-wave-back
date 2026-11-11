@@ -1,7 +1,7 @@
 """Pure domain calculator for spatial coverage metrics (RN-44, RN-45, RN-46, RN-47)."""
 
 import math
-from typing import Sequence
+from collections.abc import Sequence
 
 from agrowave.modules.simulation.domain.coverage_models import (
     CoverageMetrics,
@@ -63,9 +63,7 @@ def compute_coverage_metrics(
         if mean_mw <= 0.0:
             ivc = 0.0
         else:
-            variance_mw = sum((p - mean_mw) ** 2 for p in powers_mw) / float(
-                covered_count - 1
-            )
+            variance_mw = sum((p - mean_mw) ** 2 for p in powers_mw) / float(covered_count - 1)
             std_mw = math.sqrt(variance_mw)
             ivc = std_mw / mean_mw
 

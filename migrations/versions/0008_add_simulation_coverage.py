@@ -18,10 +18,18 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # 1. Add summary columns to simulation_simulation
-    op.add_column("simulation_simulation", sa.Column("effective_coverage_area_km2", sa.Float(), nullable=True))
-    op.add_column("simulation_simulation", sa.Column("coverage_percentage", sa.Float(), nullable=True))
-    op.add_column("simulation_simulation", sa.Column("max_coverage_radius_km", sa.Float(), nullable=True))
-    op.add_column("simulation_simulation", sa.Column("variability_index", sa.Float(), nullable=True))
+    op.add_column(
+        "simulation_simulation", sa.Column("effective_coverage_area_km2", sa.Float(), nullable=True)
+    )
+    op.add_column(
+        "simulation_simulation", sa.Column("coverage_percentage", sa.Float(), nullable=True)
+    )
+    op.add_column(
+        "simulation_simulation", sa.Column("max_coverage_radius_km", sa.Float(), nullable=True)
+    )
+    op.add_column(
+        "simulation_simulation", sa.Column("variability_index", sa.Float(), nullable=True)
+    )
 
     # 2. Create simulation_coverage_result table
     op.create_table(
@@ -37,7 +45,9 @@ def upgrade() -> None:
         sa.Column("covered_samples_count", sa.Integer(), nullable=False),
         sa.Column("total_samples_count", sa.Integer(), nullable=False),
         sa.Column("samples", sa.JSON(), nullable=False),
-        sa.ForeignKeyConstraint(["simulation_id"], ["simulation_simulation.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["simulation_id"], ["simulation_simulation.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -49,7 +59,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_simulation_coverage_result_simulation_id", table_name="simulation_coverage_result")
+    op.drop_index(
+        "ix_simulation_coverage_result_simulation_id", table_name="simulation_coverage_result"
+    )
     op.drop_table("simulation_coverage_result")
     op.drop_column("simulation_simulation", "variability_index")
     op.drop_column("simulation_simulation", "max_coverage_radius_km")

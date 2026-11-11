@@ -1,6 +1,7 @@
 """Unit and integration tests for polar sweep coverage engine (AC-27)."""
 
 from uuid import uuid4
+
 import pytest
 
 from agrowave.modules.simulation.domain.coverage_models import (
@@ -83,7 +84,9 @@ def test_ac27_polar_sweep_trajectories_and_itm_loss() -> None:
 
     # Near sample (500m) vs far sample (2000m) on same azimuth (e.g. 0 deg)
     sample_500m = next(s for s in result.samples if s.azimuth_deg == 0.0 and s.distance_m == 500.0)
-    sample_2000m = next(s for s in result.samples if s.azimuth_deg == 0.0 and s.distance_m == 2000.0)
+    sample_2000m = next(
+        s for s in result.samples if s.azimuth_deg == 0.0 and s.distance_m == 2000.0
+    )
 
     # Free space + ground loss increases with distance, so Prx at 500m must be greater than at 2000m
     assert sample_500m.received_power_dbm > sample_2000m.received_power_dbm

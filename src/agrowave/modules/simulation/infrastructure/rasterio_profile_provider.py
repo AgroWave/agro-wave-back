@@ -61,7 +61,7 @@ class RasterioTerrainProfileProvider:
             raise TerrainProfileExtractionError(f"DEM '{dem_id}' has no storage object key")
 
         step_m = max(float(resolution_m), 1.0)
-        num_intervals = max(2, math.ceil(distance_m / step_m))
+        num_intervals = max(9, int(distance_m / step_m))
         if num_intervals + 1 > MAX_ITM_PROFILE_POINTS:
             num_intervals = MAX_ITM_PROFILE_POINTS - 1
         actual_step_m = distance_m / num_intervals
@@ -69,8 +69,8 @@ class RasterioTerrainProfileProvider:
         distances_m = tuple(round(i * actual_step_m, 2) for i in range(num_intervals + 1))
         coords = [
             (
-                start_lng + (i / num_intervals) * (end_lng - start_lng),
-                start_lat + (i / num_intervals) * (end_lat - start_lat),
+                end_lng + ((num_intervals - i) / num_intervals) * (start_lng - end_lng),
+                end_lat + ((num_intervals - i) / num_intervals) * (start_lat - end_lat),
             )
             for i in range(num_intervals + 1)
         ]
@@ -143,5 +143,5 @@ class RasterioTerrainProfileProvider:
             val = float(val_arr[0])
             if math.isnan(val) or val < -100.0:
                 val = 0.0
-            elevations.append(round(val, 2))
+            elevations.append(round(val, 4))
         return tuple(elevations)
