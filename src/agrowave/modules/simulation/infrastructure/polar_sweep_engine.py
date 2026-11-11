@@ -30,6 +30,40 @@ class PolarSweepCoverageEngine:
 
     METERS_PER_DEGREE_LAT: float = 111320.0
 
+    def compute_coverage(
+        self,
+        access_node: dict[str, Any],
+        bounds: dict[str, float],
+        radio_params: dict[str, Any],
+        itm_params: dict[str, Any],
+        azimuth_count: int = 360,
+        radial_step_m: float = 100.0,
+        max_radius_m: float = 5000.0,
+    ) -> CoverageResult:
+        """Computes polar coverage samples and consolidated DSR metrics (CoverageEnginePort).
+
+        Args:
+            access_node: Access node dictionary with position, height, gain, sensitivity.
+            bounds: Geographical bounding box.
+            radio_params: Radio configuration dictionary.
+            itm_params: Longley-Rice environmental parameters.
+            azimuth_count: Number of azimuthal angles (default 360).
+            radial_step_m: Spatial resolution along each radial, in meters (m).
+            max_radius_m: Maximum evaluation distance, in meters (m).
+
+        Returns:
+            CoverageResult containing all evaluated samples and DSR metrics.
+        """
+        return self.compute_synthetic_coverage(
+            access_node=access_node,
+            bounds=bounds,
+            radio_params=radio_params,
+            itm_params=itm_params,
+            azimuth_count=azimuth_count,
+            radial_step_m=radial_step_m,
+            max_radius_m=max_radius_m,
+        )
+
     def compute_synthetic_coverage(
         self,
         access_node: dict[str, Any],

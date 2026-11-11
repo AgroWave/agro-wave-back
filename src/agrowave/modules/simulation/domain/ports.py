@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
 
+from agrowave.modules.simulation.domain.coverage_models import CoverageResult
 from agrowave.modules.simulation.domain.models import (
     PathLossQuantile,
     ScenarioSnapshot,
@@ -137,4 +138,34 @@ class SimulationJobRunner(Protocol):
 
     def enqueue(self, simulation_id: UUID) -> None:
         """Enqueues a simulation ID for asynchronous execution."""
+        ...
+
+
+class CoverageEnginePort(Protocol):
+    """Port for computing area coverage simulation from an access node (RN-48)."""
+
+    def compute_coverage(
+        self,
+        access_node: dict[str, Any],
+        bounds: dict[str, float],
+        radio_params: dict[str, Any],
+        itm_params: dict[str, Any],
+        azimuth_count: int = 360,
+        radial_step_m: float = 100.0,
+        max_radius_m: float = 5000.0,
+    ) -> CoverageResult:
+        """Computes polar coverage samples and consolidated DSR metrics.
+
+        Args:
+            access_node: Access node dictionary with position, height, gain, sensitivity.
+            bounds: Geographical bounding box.
+            radio_params: Radio configuration dictionary.
+            itm_params: Longley-Rice environmental parameters.
+            azimuth_count: Number of azimuthal angles.
+            radial_step_m: Sampling step along each radial, in meters (m).
+            max_radius_m: Maximum radial evaluation distance, in meters (m).
+
+        Returns:
+            CoverageResult containing evaluated samples and DSR metrics.
+        """
         ...

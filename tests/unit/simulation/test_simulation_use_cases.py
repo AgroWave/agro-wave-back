@@ -436,3 +436,70 @@ def test_ac22_engine_warnings_persisted_in_completed_simulation() -> None:
         owner_id=owner_id,
     )
     assert len(report.simulations) == 2
+
+
+def test_ac28_simulation_run_includes_coverage_result() -> None:
+    """Given a simulation run with coverage engine configured, COMPLETED sim has coverage metrics (AC-28, RN-49)."""
+    from agrowave.modules.simulation.domain.coverage_models import (
+        CoverageMetrics,
+        CoverageResult,
+    )
+
+    repo = InMemorySimulationRepository()
+    snapshot = _build_valid_snapshot()
+    owner_id = uuid4()
+    sim = CreateSimulation(
+        repository=repo, snapshot_source=FakeSnapshotSource(snapshot=snapshot)
+    ).execute(
+        CreateSimulationInput(
+            owner_id=owner_id,
+            scenario_id=snapshot.scenario_id,
+            name="Sim With Coverage",
+            description="Testing AC-28",
+        )
+    )
+
+    class FakeCoverageEngine:
+        def compute_coverage(self, **kwargs: Any) -> CoverageResult:
+            metrics = CoverageMetrics(
+                effective_coverage_area_km2=15.42,
+                coverage_percentage=78.5,
+                max_coverage_radius_km=4.85,
+                variability_index=0.62,
+                total_area_km2=19.63,
+                covered_samples_count=280,
+                total_samples_count=360,
+            )
+            return CoverageResult(
+                metrics=metrics,
+                samples=(),
+                access_node_id=UUID(str(snapshot.access_nodes[0]["id"])),
+            )
+
+    executor = ExecuteSimulationJob(
+        repository=repo,
+        profile_provider=FakeTerrainProfileProvider(),
+        propagation_engine=FakePropagationEngine(),
+        coverage_engine=FakeCoverageEngine(),
+    )
+    runner = SyncJobRunner(executor=executor)
+
+    RunSimulation(repository=repo, job_runner=runner).execute(
+        simulation_id=sim.id, owner_id=owner_id
+    )
+
+    completed_sim = repo.get_by_id(sim.id, owner_id)
+    assert completed_sim is not None
+    assert completed_sim.status == SimulationStatus.COMPLETED
+    assert completed_sim.result is not None
+    assert completed_sim.result.coverage_result is not None
+    assert completed_sim.result.coverage_result.metrics.effective_coverage_area_km2 == 15.42
+    assert completed_sim.result.coverage_result.metrics.coverage_percentage == 78.5
+    assert completed_sim.result.coverage_result.metrics.max_coverage_radius_km == 4.85
+    assert completed_sim.result.coverage_result.metrics.variability_index == 0.62
+
+    # Check that summary exposes coverage metrics too
+    summary = completed_sim.result.compute_summary()
+    assert summary.coverage_metrics is not None
+    assert summary.coverage_metrics.effective_coverage_area_km2 == 15.42
+
