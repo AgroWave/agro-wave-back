@@ -16,6 +16,7 @@ from agrowave.modules.simulation.domain.errors import (
 )
 from agrowave.modules.simulation.domain.models import ScenarioSnapshot, Technology
 from agrowave.modules.simulation.domain.ports import (
+    CoverageEnginePort,
     PropagationEngine,
     TerrainProfileProvider,
 )
@@ -171,12 +172,14 @@ class ThreadPoolSimulationJobRunner:
         engine: Engine,
         profile_provider: TerrainProfileProvider,
         propagation_engine: PropagationEngine,
+        coverage_engine: CoverageEnginePort | None = None,
         run_synchronously: bool = False,
     ) -> None:
         """Initializes the job runner with a database engine and external ports."""
         self._engine = engine
         self._profile_provider = profile_provider
         self._propagation_engine = propagation_engine
+        self._coverage_engine = coverage_engine
         self._run_synchronously = run_synchronously
 
     def enqueue(self, simulation_id: UUID) -> None:
@@ -193,5 +196,6 @@ class ThreadPoolSimulationJobRunner:
             repository=repo,
             profile_provider=self._profile_provider,
             propagation_engine=self._propagation_engine,
+            coverage_engine=self._coverage_engine,
         )
         executor.execute(simulation_id)

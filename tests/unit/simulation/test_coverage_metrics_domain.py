@@ -1,14 +1,15 @@
 """Unit tests for DSR coverage metrics calculation in the domain layer (AC-26)."""
 
 import math
+
 import pytest
 
+from agrowave.modules.simulation.domain.coverage_calculator import (
+    compute_coverage_metrics,
+)
 from agrowave.modules.simulation.domain.coverage_models import (
     CoverageMetrics,
     CoverageSample,
-)
-from agrowave.modules.simulation.domain.coverage_calculator import (
-    compute_coverage_metrics,
 )
 
 
@@ -18,7 +19,7 @@ def test_ac26_coverage_metrics_calculation_and_linear_ivc() -> None:
     Given 4 spatial samples covering a 4 km² scenario:
         - Sample 1: viable (-90 dBm = 1e-9 mW), distance = 1000 m (1.0 km), cell = 1.0 km²
         - Sample 2: viable (-100 dBm = 1e-10 mW), distance = 2500 m (2.5 km), cell = 1.0 km²
-        - Sample 3: non-viable (-140 dBm, below -137 dBm sensitivity), distance = 3000 m, cell = 1.0 km²
+        - Sample 3: non-viable (-140 dBm, below sensitivity), distance = 3000 m, cell = 1.0 km²
         - Sample 4: non-viable (-145 dBm), distance = 3500 m, cell = 1.0 km²
     Total area = 4.0 km².
     Sensitivity threshold = -137.0 dBm.

@@ -1,7 +1,6 @@
 """Polar sweep coverage engine implementing spatial Longley-Rice simulation (RN-48)."""
 
 import math
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -9,7 +8,6 @@ from agrowave.modules.simulation.domain.coverage_calculator import (
     compute_coverage_metrics,
 )
 from agrowave.modules.simulation.domain.coverage_models import (
-    CoverageMetrics,
     CoverageResult,
     CoverageSample,
 )
@@ -80,7 +78,7 @@ class PolarSweepCoverageEngine:
         Args:
             access_node: Access node dictionary with position, height, gain, sensitivity.
             bounds: Geographical bounding box (south, west, north, east).
-            radio_params: Radio configuration (frequency_mhz, tx_power_dbm, tx_gain_dbi, tx_height_agl_m).
+            radio_params: Radio config (frequency, tx power, gain, height).
             itm_params: Longley-Rice environmental parameters (ens0, klim, eps, sgm).
             azimuth_count: Number of azimuthal angles (default 360).
             radial_step_m: Spatial resolution along each radial, in meters (m).
@@ -90,8 +88,8 @@ class PolarSweepCoverageEngine:
         Returns:
             CoverageResult containing all evaluated samples and DSR metrics.
         """
-        gw_lat = float(access_node["latitude"])
-        gw_lon = float(access_node["longitude"])
+        gw_lat = float(access_node.get("lat", access_node.get("latitude", 0.0)))
+        gw_lon = float(access_node.get("lng", access_node.get("longitude", 0.0)))
         gw_rx_gain = float(access_node.get("antenna_gain_dbi", 3.0))
         gw_rx_height = float(access_node.get("height_agl_m", 15.0))
         gw_sensitivity = float(access_node.get("sensitivity_dbm", -137.0))

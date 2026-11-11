@@ -150,7 +150,7 @@ def test_ac05_02_simulation_migrations_clean(empty_test_database: str) -> None:
 
 
 def test_ac06_01_coverage_migrations_clean(empty_test_database: str) -> None:
-    """AC-06-01: Alembic migrations apply cleanly and create coverage result tables without diffs."""
+    """AC-06-01: Alembic migrations apply cleanly and create coverage tables without diffs."""
     config = _alembic_config(empty_test_database)
 
     command.upgrade(config, "head")

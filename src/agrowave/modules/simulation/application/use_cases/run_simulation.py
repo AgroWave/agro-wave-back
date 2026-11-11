@@ -90,7 +90,7 @@ class ExecuteSimulationJob:
         propagation_engine: PropagationEngine,
         coverage_engine: CoverageEnginePort | None = None,
     ) -> None:
-        """Initializes the background executor with repository, terrain, propagation, and coverage ports."""
+        """Initializes executor with repository, terrain, propagation, and coverage ports."""
         self._repository = repository
         self._profile_provider = profile_provider
         self._propagation_engine = propagation_engine

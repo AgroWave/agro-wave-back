@@ -439,7 +439,7 @@ def test_ac22_engine_warnings_persisted_in_completed_simulation() -> None:
 
 
 def test_ac28_simulation_run_includes_coverage_result() -> None:
-    """Given a simulation run with coverage engine configured, COMPLETED sim has coverage metrics (AC-28, RN-49)."""
+    """Given a simulation run with coverage engine, COMPLETED sim has coverage metrics (AC-28)."""
     from agrowave.modules.simulation.domain.coverage_models import (
         CoverageMetrics,
         CoverageResult,
@@ -502,4 +502,3 @@ def test_ac28_simulation_run_includes_coverage_result() -> None:
     summary = completed_sim.result.compute_summary()
     assert summary.coverage_metrics is not None
     assert summary.coverage_metrics.effective_coverage_area_km2 == 15.42
-

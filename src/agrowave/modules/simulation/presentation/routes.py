@@ -59,6 +59,11 @@ from agrowave.modules.simulation.presentation.schemas import (
     ComparedLinkRowResponse,
     ComparedSimulationSummaryResponse,
     ComparisonReportResponse,
+    CoverageExportResponse,
+    CoverageExportRow,
+    CoverageMetricsResponse,
+    CoverageResultResponse,
+    CoverageSampleResponse,
     CreateSimulationRequest,
     ElevationProfileSeriesResponse,
     FresnelAnalysisResponse,
@@ -100,6 +105,18 @@ def _to_summary_response(sim: Simulation) -> SimulationSummaryResponse | None:
     """Maps domain SimulationSummary to SimulationSummaryResponse."""
     if sim.summary is None:
         return None
+    cov_resp: CoverageMetricsResponse | None = None
+    if sim.summary.coverage_metrics is not None:
+        cm = sim.summary.coverage_metrics
+        cov_resp = CoverageMetricsResponse(
+            effective_coverage_area_km2=cm.effective_coverage_area_km2,
+            coverage_percentage=cm.coverage_percentage,
+            max_coverage_radius_km=cm.max_coverage_radius_km,
+            variability_index=cm.variability_index,
+            total_area_km2=cm.total_area_km2,
+            covered_samples_count=cm.covered_samples_count,
+            total_samples_count=cm.total_samples_count,
+        )
     return SimulationSummaryResponse(
         viable_links_pct=sim.summary.viable_links_pct,
         min_margin_db=sim.summary.min_margin_db,
@@ -107,6 +124,7 @@ def _to_summary_response(sim: Simulation) -> SimulationSummaryResponse | None:
         fresnel_clear_count=sim.summary.fresnel_clear_count,
         fresnel_marginal_count=sim.summary.fresnel_marginal_count,
         fresnel_obstructed_count=sim.summary.fresnel_obstructed_count,
+        coverage_metrics=cov_resp,
     )
 
 
@@ -186,6 +204,35 @@ def _to_simulation_results_response(sim: Simulation) -> SimulationResultsRespons
                 )
             )
 
+    cov_result_resp: CoverageResultResponse | None = None
+    if sim.result is not None and sim.result.coverage_result is not None:
+        cr = sim.result.coverage_result
+        cov_result_resp = CoverageResultResponse(
+            id=cr.id,
+            access_node_id=cr.access_node_id,
+            metrics=CoverageMetricsResponse(
+                effective_coverage_area_km2=cr.metrics.effective_coverage_area_km2,
+                coverage_percentage=cr.metrics.coverage_percentage,
+                max_coverage_radius_km=cr.metrics.max_coverage_radius_km,
+                variability_index=cr.metrics.variability_index,
+                total_area_km2=cr.metrics.total_area_km2,
+                covered_samples_count=cr.metrics.covered_samples_count,
+                total_samples_count=cr.metrics.total_samples_count,
+            ),
+            samples=[
+                CoverageSampleResponse(
+                    latitude=s.latitude,
+                    longitude=s.longitude,
+                    distance_m=s.distance_m,
+                    azimuth_deg=s.azimuth_deg,
+                    received_power_dbm=s.received_power_dbm,
+                    viable=s.viable,
+                    cell_area_km2=s.cell_area_km2,
+                )
+                for s in cr.samples
+            ],
+        )
+
     return SimulationResultsResponse(
         id=sim.id,
         owner_id=sim.owner_id,
@@ -204,6 +251,7 @@ def _to_simulation_results_response(sim: Simulation) -> SimulationResultsRespons
         finished_at=sim.finished_at,
         link_results=link_results,
         warnings=warnings,
+        coverage_result=cov_result_resp,
     )
 
 
@@ -431,5 +479,81 @@ def delete_simulation(
             owner_id=current_user.id,
         )
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except SimulationDomainError as err:
+        return _domain_error_response(err)
+
+
+@router.get(
+    "/{simulation_id}/coverage/export",
+    response_model=CoverageExportResponse,
+)
+def export_coverage_data(
+    simulation_id: UUID,
+    current_user: User = Depends(get_current_user),
+    repository: SimulationRepository = Depends(get_simulation_repository),
+) -> CoverageExportResponse | JSONResponse:
+    """Exports spatial coverage data in Radio Mobile compatible structure (UC-CO-04)."""
+    try:
+        sim = GetSimulationResults(repository=repository).execute(
+            simulation_id=simulation_id,
+            owner_id=current_user.id,
+        )
+        if sim.status != SimulationStatus.COMPLETED or sim.result is None:
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "code": "SimulationNotCompleted",
+                    "message": "Simulation is not in COMPLETED status.",
+                },
+            )
+        if sim.result.coverage_result is None:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={
+                    "code": "CoverageDataNotFound",
+                    "message": "No coverage data available for this simulation.",
+                },
+            )
+
+        cr = sim.result.coverage_result
+        snapshot = sim.snapshot
+        primary_an = snapshot.access_nodes[0] if snapshot.access_nodes else {}
+        an_name = str(primary_an.get("name", "Gateway"))
+        an_lat = float(primary_an.get("lat", 0.0))
+        an_lon = float(primary_an.get("lng", 0.0))
+        sens_dbm = float(primary_an.get("sensitivity_dbm", -137.0))
+
+        export_rows = [
+            CoverageExportRow(
+                latitude=s.latitude,
+                longitude=s.longitude,
+                received_power_dbm=s.received_power_dbm,
+                viable=s.viable,
+                distance_km=round(s.distance_m / 1000.0, 3),
+                azimuth_deg=s.azimuth_deg,
+            )
+            for s in cr.samples
+        ]
+        metrics_resp = CoverageMetricsResponse(
+            effective_coverage_area_km2=cr.metrics.effective_coverage_area_km2,
+            coverage_percentage=cr.metrics.coverage_percentage,
+            max_coverage_radius_km=cr.metrics.max_coverage_radius_km,
+            variability_index=cr.metrics.variability_index,
+            total_area_km2=cr.metrics.total_area_km2,
+            covered_samples_count=cr.metrics.covered_samples_count,
+            total_samples_count=cr.metrics.total_samples_count,
+        )
+        return CoverageExportResponse(
+            simulation_id=sim.id,
+            simulation_name=sim.name,
+            technology=sim.technology.value,
+            frequency_mhz=snapshot.frequency_mhz,
+            access_node_name=an_name,
+            access_node_lat=an_lat,
+            access_node_lon=an_lon,
+            sensitivity_dbm=sens_dbm,
+            metrics=metrics_resp,
+            samples=export_rows,
+        )
     except SimulationDomainError as err:
         return _domain_error_response(err)
