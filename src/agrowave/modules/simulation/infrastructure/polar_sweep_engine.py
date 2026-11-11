@@ -28,6 +28,16 @@ class PolarSweepCoverageEngine:
 
     METERS_PER_DEGREE_LAT: float = 111320.0
 
+    @staticmethod
+    def _haversine_distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculates great-circle distance between two coordinates in meters."""
+        r = 6371000.0
+        p1, p2 = math.radians(lat1), math.radians(lat2)
+        dp = math.radians(lat2 - lat1)
+        dl = math.radians(lon2 - lon1)
+        a = math.sin(dp / 2.0) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2.0) ** 2
+        return 2.0 * r * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+
     def compute_coverage(
         self,
         access_node: dict[str, Any],
@@ -108,6 +118,45 @@ class PolarSweepCoverageEngine:
         step_angle_deg = 360.0 / float(azimuth_count)
         delta_theta_rad = (2.0 * math.pi) / float(azimuth_count)
 
+        has_bounds = (
+            bounds is not None
+            and "south" in bounds
+            and "north" in bounds
+            and "west" in bounds
+            and "east" in bounds
+        )
+        if has_bounds:
+            south = float(bounds["south"])
+            north = float(bounds["north"])
+            west = float(bounds["west"])
+            east = float(bounds["east"])
+            mid_lat = (south + north) / 2.0
+            height_km = abs(north - south) * (self.METERS_PER_DEGREE_LAT / 1000.0)
+            width_km = abs(east - west) * (
+                self.METERS_PER_DEGREE_LAT * math.cos(math.radians(mid_lat)) / 1000.0
+            )
+            exact_bounds_area_km2 = height_km * width_km
+
+            corners = [
+                (south, west),
+                (south, east),
+                (north, west),
+                (north, east),
+            ]
+            corner_dists_m = [
+                self._haversine_distance_m(gw_lat, gw_lon, c_lat, c_lon)
+                for c_lat, c_lon in corners
+            ]
+            max_corner_dist_m = max(corner_dists_m) if corner_dists_m else max_radius_m
+            # If default 5000m was passed, expand up to corner reach; if specific max_radius was set, respect it
+            eval_max_radius_m = (
+                max_corner_dist_m if max_radius_m == 5000.0 else min(max_radius_m, max_corner_dist_m)
+            )
+        else:
+            south, north, west, east = -90.0, 90.0, -180.0, 180.0
+            exact_bounds_area_km2 = math.pi * ((max_radius_m / 1000.0) ** 2)
+            eval_max_radius_m = max_radius_m
+
         samples: list[CoverageSample] = []
         lat_rad = math.radians(gw_lat)
         cos_lat = max(0.01, math.cos(lat_rad))
@@ -116,7 +165,7 @@ class PolarSweepCoverageEngine:
             float(d)
             for d in range(
                 int(radial_step_m),
-                int(max_radius_m) + 1,
+                int(eval_max_radius_m) + 1,
                 int(radial_step_m),
             )
         ]
@@ -132,6 +181,10 @@ class PolarSweepCoverageEngine:
                 d_lon = (dist_m * sin_az) / (self.METERS_PER_DEGREE_LAT * cos_lat)
                 pt_lat = gw_lat + d_lat
                 pt_lon = gw_lon + d_lon
+
+                # Strictly clip to the exact Study Area bounds (break radial when boundary is reached)
+                if has_bounds and not (south <= pt_lat <= north and west <= pt_lon <= east):
+                    break
 
                 # Elementary polar sector area in km²
                 cell_area_km2 = (dist_m * radial_step_m * delta_theta_rad) * 1e-6
@@ -164,8 +217,12 @@ class PolarSweepCoverageEngine:
                     )
                 )
 
-        # Total scenario area: circle of radius max_radius_m in km²
-        total_area_km2 = math.pi * ((max_radius_m / 1000.0) ** 2)
+        # Total scenario area: exact study area if bounded, or circle of radius max_radius_m
+        total_area_km2 = (
+            exact_bounds_area_km2
+            if has_bounds
+            else math.pi * ((max_radius_m / 1000.0) ** 2)
+        )
         metrics = compute_coverage_metrics(
             samples=samples,
             total_area_km2=total_area_km2,
