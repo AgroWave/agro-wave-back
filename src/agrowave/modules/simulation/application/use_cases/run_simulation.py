@@ -3,6 +3,7 @@
 import math
 from uuid import UUID
 
+from agrowave.modules.simulation.domain.coverage_models import CoverageResult
 from agrowave.modules.simulation.domain.errors import SimulationNotFoundError
 from agrowave.modules.simulation.domain.models import (
     LinkResult,
@@ -14,6 +15,7 @@ from agrowave.modules.simulation.domain.models import (
     SimulationWarning,
 )
 from agrowave.modules.simulation.domain.ports import (
+    CoverageEnginePort,
     PropagationEngine,
     SimulationJobRunner,
     SimulationRepository,
@@ -86,11 +88,13 @@ class ExecuteSimulationJob:
         repository: SimulationRepository,
         profile_provider: TerrainProfileProvider,
         propagation_engine: PropagationEngine,
+        coverage_engine: CoverageEnginePort | None = None,
     ) -> None:
-        """Initializes the background executor with repository, terrain, and propagation ports."""
+        """Initializes executor with repository, terrain, propagation, and coverage ports."""
         self._repository = repository
         self._profile_provider = profile_provider
         self._propagation_engine = propagation_engine
+        self._coverage_engine = coverage_engine
 
     def execute(self, simulation_id: UUID) -> None:
         """Evaluates Fresnel, path loss, and link budget for every link in the snapshot.
@@ -123,13 +127,10 @@ class ExecuteSimulationJob:
                 end_lat = float(an["lat"])
                 end_lng = float(an["lng"])
 
-                if "distance_km" in link_data and link_data["distance_km"] is not None:
-                    distance_m = round(float(link_data["distance_km"]) * 1000.0, 2)
-                else:
-                    distance_m = round(
-                        _haversine_distance_m(start_lat, start_lng, end_lat, end_lng),
-                        2,
-                    )
+                exact_distance_m = _haversine_distance_m(start_lat, start_lng, end_lat, end_lng)
+                if exact_distance_m <= 0.0 and link_data.get("distance_km") is not None:
+                    exact_distance_m = float(link_data["distance_km"]) * 1000.0
+                distance_m = round(exact_distance_m, 2)
 
                 tx_height_m = float(en["height_agl_m"])
                 rx_height_m = float(an["height_agl_m"])
@@ -150,7 +151,7 @@ class ExecuteSimulationJob:
                     start_lng=start_lng,
                     end_lat=end_lat,
                     end_lng=end_lng,
-                    distance_m=distance_m,
+                    distance_m=exact_distance_m,
                     resolution_m=snapshot.dem_resolution_m,
                 )
 
@@ -182,7 +183,7 @@ class ExecuteSimulationJob:
                     )
 
                 fspl_db = FreeSpacePathLoss.calculate(
-                    distance_m=distance_m,
+                    distance_m=exact_distance_m,
                     frequency_mhz=snapshot.frequency_mhz,
                 )
                 path_loss_pred = PathLossPrediction(
@@ -216,10 +217,38 @@ class ExecuteSimulationJob:
                     )
                 )
 
+            coverage_res: CoverageResult | None = None
+            if self._coverage_engine is not None and snapshot.access_nodes:
+                try:
+                    primary_an = snapshot.access_nodes[0]
+                    first_en = snapshot.end_nodes[0] if snapshot.end_nodes else {}
+                    radio_params = {
+                        "frequency_mhz": snapshot.frequency_mhz,
+                        "tx_power_dbm": float(first_en.get("tx_power_nominal_dbm", 20.0)),
+                        "tx_gain_dbi": float(first_en.get("antenna_gain_dbi", 2.0)),
+                        "tx_height_agl_m": float(first_en.get("height_agl_m", 2.0)),
+                    }
+                    coverage_res = self._coverage_engine.compute_coverage(
+                        access_node=primary_an,
+                        bounds=snapshot.bounds,
+                        radio_params=radio_params,
+                        itm_params=snapshot.propagation_params,
+                    )
+                except Exception as cov_err:
+                    warnings.append(
+                        SimulationWarning(
+                            link_id=None,
+                            source="COVERAGE_ENGINE",
+                            code="COVERAGE_CALC_FAILED",
+                            message=str(cov_err),
+                        )
+                    )
+
             simulation.complete(
                 SimulationResult(
                     link_results=tuple(link_results),
                     warnings=tuple(warnings),
+                    coverage_result=coverage_res,
                 )
             )
             self._repository.save(simulation)

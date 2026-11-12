@@ -145,4 +145,26 @@ def test_ac05_02_simulation_migrations_clean(empty_test_database: str) -> None:
         "simulation_path_loss_quantile",
         "simulation_link_profile",
         "simulation_warning",
+        "simulation_coverage_result",
     }, "simulation migrations must create the simulation tables"
+
+
+def test_ac06_01_coverage_migrations_clean(empty_test_database: str) -> None:
+    """AC-06-01: Alembic migrations apply cleanly and create coverage tables without diffs."""
+    config = _alembic_config(empty_test_database)
+
+    command.upgrade(config, "head")
+    command.check(config)
+
+    engine = create_engine(empty_test_database)
+    with engine.connect() as connection:
+        tables = set(
+            connection.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_name LIKE 'simulation_%'"
+                )
+            ).scalars()
+        )
+    engine.dispose()
+    assert "simulation_coverage_result" in tables, "coverage table must be created"

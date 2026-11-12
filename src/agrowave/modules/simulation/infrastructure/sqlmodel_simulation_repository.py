@@ -6,6 +6,11 @@ from uuid import UUID
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, col, delete, select
 
+from agrowave.modules.simulation.domain.coverage_models import (
+    CoverageMetrics,
+    CoverageResult,
+    CoverageSample,
+)
 from agrowave.modules.simulation.domain.models import (
     ElevationProfileSeries,
     FresnelAnalysis,
@@ -23,6 +28,7 @@ from agrowave.modules.simulation.domain.models import (
     Technology,
 )
 from agrowave.modules.simulation.infrastructure.row_models import (
+    SimulationCoverageResultRow,
     SimulationLinkProfileRow,
     SimulationLinkResultRow,
     SimulationPathLossQuantileRow,
@@ -75,6 +81,17 @@ class SqlModelSimulationRepository:
                     existing.fresnel_clear_count = simulation.summary.fresnel_clear_count
                     existing.fresnel_marginal_count = simulation.summary.fresnel_marginal_count
                     existing.fresnel_obstructed_count = simulation.summary.fresnel_obstructed_count
+                    if simulation.summary.coverage_metrics is not None:
+                        cm = simulation.summary.coverage_metrics
+                        existing.effective_coverage_area_km2 = cm.effective_coverage_area_km2
+                        existing.coverage_percentage = cm.coverage_percentage
+                        existing.max_coverage_radius_km = cm.max_coverage_radius_km
+                        existing.variability_index = cm.variability_index
+                    else:
+                        existing.effective_coverage_area_km2 = None
+                        existing.coverage_percentage = None
+                        existing.max_coverage_radius_km = None
+                        existing.variability_index = None
                 else:
                     existing.viable_links_pct = None
                     existing.min_margin_db = None
@@ -82,6 +99,10 @@ class SqlModelSimulationRepository:
                     existing.fresnel_clear_count = None
                     existing.fresnel_marginal_count = None
                     existing.fresnel_obstructed_count = None
+                    existing.effective_coverage_area_km2 = None
+                    existing.coverage_percentage = None
+                    existing.max_coverage_radius_km = None
+                    existing.variability_index = None
                 session.add(existing)
 
             prev_link_rows = session.exec(
@@ -107,9 +128,41 @@ class SqlModelSimulationRepository:
                     col(SimulationWarningRow.simulation_id) == simulation.id
                 )
             )
+            session.exec(
+                delete(SimulationCoverageResultRow).where(
+                    col(SimulationCoverageResultRow.simulation_id) == simulation.id
+                )
+            )
             session.flush()
 
             if simulation.result is not None:
+                if simulation.result.coverage_result is not None:
+                    cr = simulation.result.coverage_result
+                    cov_row = SimulationCoverageResultRow(
+                        id=cr.id,
+                        simulation_id=simulation.id,
+                        access_node_id=cr.access_node_id,
+                        effective_coverage_area_km2=cr.metrics.effective_coverage_area_km2,
+                        coverage_percentage=cr.metrics.coverage_percentage,
+                        max_coverage_radius_km=cr.metrics.max_coverage_radius_km,
+                        variability_index=cr.metrics.variability_index,
+                        total_area_km2=cr.metrics.total_area_km2,
+                        covered_samples_count=cr.metrics.covered_samples_count,
+                        total_samples_count=cr.metrics.total_samples_count,
+                        samples=[
+                            {
+                                "latitude": s.latitude,
+                                "longitude": s.longitude,
+                                "distance_m": s.distance_m,
+                                "azimuth_deg": s.azimuth_deg,
+                                "received_power_dbm": s.received_power_dbm,
+                                "viable": s.viable,
+                                "cell_area_km2": s.cell_area_km2,
+                            }
+                            for s in cr.samples
+                        ],
+                    )
+                    session.add(cov_row)
                 link_id_to_result_id: dict[UUID, UUID] = {}
                 for lr in simulation.result.link_results:
                     link_id_to_result_id[lr.link_id] = lr.id
@@ -306,6 +359,26 @@ class SqlModelSimulationRepository:
             fresnel_obstructed_count=(
                 simulation.summary.fresnel_obstructed_count if simulation.summary else None
             ),
+            effective_coverage_area_km2=(
+                simulation.summary.coverage_metrics.effective_coverage_area_km2
+                if simulation.summary and simulation.summary.coverage_metrics
+                else None
+            ),
+            coverage_percentage=(
+                simulation.summary.coverage_metrics.coverage_percentage
+                if simulation.summary and simulation.summary.coverage_metrics
+                else None
+            ),
+            max_coverage_radius_km=(
+                simulation.summary.coverage_metrics.max_coverage_radius_km
+                if simulation.summary and simulation.summary.coverage_metrics
+                else None
+            ),
+            variability_index=(
+                simulation.summary.coverage_metrics.variability_index
+                if simulation.summary and simulation.summary.coverage_metrics
+                else None
+            ),
             failure_reason=simulation.failure_reason,
             created_at=simulation.created_at,
             started_at=simulation.started_at,
@@ -320,6 +393,18 @@ class SqlModelSimulationRepository:
     ) -> Simulation:
         """Reconstructs a Simulation domain aggregate from database rows."""
         snapshot = ScenarioSnapshot.from_dict(row.snapshot, row.snapshot_version)
+        cov_metrics: CoverageMetrics | None = None
+        if row.effective_coverage_area_km2 is not None:
+            cov_metrics = CoverageMetrics(
+                effective_coverage_area_km2=row.effective_coverage_area_km2,
+                coverage_percentage=row.coverage_percentage or 0.0,
+                max_coverage_radius_km=row.max_coverage_radius_km or 0.0,
+                variability_index=row.variability_index or 0.0,
+                total_area_km2=0.0,
+                covered_samples_count=0,
+                total_samples_count=0,
+            )
+
         summary: SimulationSummary | None = None
         if row.viable_links_pct is not None and row.min_margin_db is not None:
             summary = SimulationSummary(
@@ -329,6 +414,7 @@ class SqlModelSimulationRepository:
                 fresnel_clear_count=row.fresnel_clear_count or 0,
                 fresnel_marginal_count=row.fresnel_marginal_count or 0,
                 fresnel_obstructed_count=row.fresnel_obstructed_count or 0,
+                coverage_metrics=cov_metrics,
             )
 
         result: SimulationResult | None = None
@@ -411,9 +497,56 @@ class SqlModelSimulationRepository:
                 )
                 for w in warn_rows
             )
+
+            cov_row = session.exec(
+                select(SimulationCoverageResultRow).where(
+                    SimulationCoverageResultRow.simulation_id == row.id
+                )
+            ).first()
+            coverage_result: CoverageResult | None = None
+            if cov_row is not None:
+                full_metrics = CoverageMetrics(
+                    effective_coverage_area_km2=cov_row.effective_coverage_area_km2,
+                    coverage_percentage=cov_row.coverage_percentage,
+                    max_coverage_radius_km=cov_row.max_coverage_radius_km,
+                    variability_index=cov_row.variability_index,
+                    total_area_km2=cov_row.total_area_km2,
+                    covered_samples_count=cov_row.covered_samples_count,
+                    total_samples_count=cov_row.total_samples_count,
+                )
+                samples = tuple(
+                    CoverageSample(
+                        latitude=float(s["latitude"]),
+                        longitude=float(s["longitude"]),
+                        distance_m=float(s["distance_m"]),
+                        azimuth_deg=float(s["azimuth_deg"]),
+                        received_power_dbm=float(s["received_power_dbm"]),
+                        viable=bool(s["viable"]),
+                        cell_area_km2=float(s.get("cell_area_km2", 0.0)),
+                    )
+                    for s in cov_row.samples
+                )
+                coverage_result = CoverageResult(
+                    id=cov_row.id,
+                    metrics=full_metrics,
+                    samples=samples,
+                    access_node_id=cov_row.access_node_id,
+                )
+                if summary is not None:
+                    summary = SimulationSummary(
+                        viable_links_pct=summary.viable_links_pct,
+                        min_margin_db=summary.min_margin_db,
+                        mean_margin_db=summary.mean_margin_db,
+                        fresnel_clear_count=summary.fresnel_clear_count,
+                        fresnel_marginal_count=summary.fresnel_marginal_count,
+                        fresnel_obstructed_count=summary.fresnel_obstructed_count,
+                        coverage_metrics=full_metrics,
+                    )
+
             result = SimulationResult(
                 link_results=tuple(link_results),
                 warnings=warnings,
+                coverage_result=coverage_result,
             )
 
         return Simulation(

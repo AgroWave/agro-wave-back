@@ -6,6 +6,10 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
+from agrowave.modules.simulation.domain.coverage_models import (
+    CoverageMetrics,
+    CoverageResult,
+)
 from agrowave.modules.simulation.domain.errors import InvalidStatusTransitionError
 
 
@@ -310,6 +314,7 @@ class SimulationSummary:
         fresnel_clear_count: Number of links with CLEAR Fresnel verdict.
         fresnel_marginal_count: Number of links with MARGINAL Fresnel verdict.
         fresnel_obstructed_count: Number of links with OBSTRUCTED Fresnel verdict.
+        coverage_metrics: Optional consolidated DSR evaluation metrics (RN-44..47).
     """
 
     viable_links_pct: float
@@ -318,6 +323,7 @@ class SimulationSummary:
     fresnel_clear_count: int
     fresnel_marginal_count: int
     fresnel_obstructed_count: int
+    coverage_metrics: CoverageMetrics | None = None
 
 
 @dataclass(frozen=True)
@@ -327,10 +333,12 @@ class SimulationResult:
     Attributes:
         link_results: Tuple of per-link evaluation results.
         warnings: Tuple of engine or terrain warnings (RN-43).
+        coverage_result: Optional spatial coverage evaluation result (RN-48, RN-49).
     """
 
     link_results: tuple[LinkResult, ...]
     warnings: tuple[SimulationWarning, ...] = ()
+    coverage_result: CoverageResult | None = None
 
     def compute_summary(self) -> SimulationSummary:
         """Computes aggregated summary metrics across all link results.
@@ -338,6 +346,7 @@ class SimulationResult:
         Returns:
             SimulationSummary with viability percentage, margin stats in dB, and Fresnel counts.
         """
+        cov_metrics = self.coverage_result.metrics if self.coverage_result else None
         total = len(self.link_results)
         if total == 0:
             return SimulationSummary(
@@ -347,6 +356,7 @@ class SimulationResult:
                 fresnel_clear_count=0,
                 fresnel_marginal_count=0,
                 fresnel_obstructed_count=0,
+                coverage_metrics=cov_metrics,
             )
         viable_count = sum(1 for lr in self.link_results if lr.viable)
         margins = [lr.margin_db for lr in self.link_results]
@@ -366,6 +376,7 @@ class SimulationResult:
             fresnel_clear_count=clear_count,
             fresnel_marginal_count=marginal_count,
             fresnel_obstructed_count=obstructed_count,
+            coverage_metrics=cov_metrics,
         )
 
 

@@ -224,42 +224,66 @@ class ItmLongleyRiceEngine:
         qr_list: list[float],
         warnings: list[tuple[str, str]],
     ) -> list[PathLossQuantile] | None:
-        """Invokes the external `itmlogic` library if installed in the environment."""
+        """Invokes `itmlogic` using the 4-stage P2P pipeline (qlrps/qlrpfl/avar)."""
         try:
-            itmlogic_mod = importlib.import_module("itmlogic")
-            p2p_fn = getattr(itmlogic_mod, "itmlogic_p2p", None)
-            if p2p_fn is None:
-                return None
-            out = p2p_fn(
-                profile=list(profile.elevations_m),
-                step_m=profile.step_m,
-                frequency_mhz=frequency_mhz,
-                tx_height_m=tx_height_agl_m,
-                rx_height_m=rx_height_agl_m,
-                ipol=ipol,
-                eps=eps,
-                sgm=sgm,
-                klim=klim,
-                ens0=ens0,
-                mdvar=mdvar,
-                qc=qc,
-                qr=qr_list,
-            )
-            kwx = int(out.get("kwx", 0))
-            if kwx != 0:
+            qlrps_mod = importlib.import_module("itmlogic.preparatory_subroutines.qlrps")
+            qlrpfl_mod = importlib.import_module("itmlogic.preparatory_subroutines.qlrpfl")
+            avar_mod = importlib.import_module("itmlogic.statistics.avar")
+            qerfi_mod = importlib.import_module("itmlogic.misc.qerfi")
+
+            qlrps = qlrps_mod.qlrps
+            qlrpfl = qlrpfl_mod.qlrpfl
+            avar = avar_mod.avar
+            qerfi = qerfi_mod.qerfi
+
+            elevations = list(profile.elevations_m)
+            n_int = len(elevations) - 1
+            distance_m = float(profile.distances_m[-1] - profile.distances_m[0])
+            step_m = distance_m / n_int
+
+            zsys = sum(elevations) / len(elevations)
+            wn, gme, ens, zgnd = qlrps(frequency_mhz, zsys, ens0, ipol, eps, sgm)
+
+            prop: dict[str, Any] = {
+                "wn": wn,
+                "gme": gme,
+                "ens": ens,
+                "zgnd": zgnd,
+                "hg": [tx_height_agl_m, rx_height_agl_m],
+                "klim": klim,
+                "klimx": 0,
+                "lvar": 5,
+                "mdvarx": mdvar,
+                "kwx": 0,
+                "pfl": [n_int, step_m] + list(reversed(elevations)),
+            }
+            prop = qlrpfl(prop)
+
+            kwx = int(prop.get("kwx", 0))
+            existing_codes = {code for code, _ in warnings}
+            if kwx != 0 and f"KWX_{kwx}" not in existing_codes:
                 warnings.append(
                     (
                         f"KWX_{kwx}",
                         f"Longley-Rice engine returned warning flag kwx={kwx}.",
                     )
                 )
-            return [
-                PathLossQuantile(
-                    reliability_pct=float(q_pct),
-                    confidence_pct=qc,
-                    loss_db=round(float(loss), 2),
+
+            fspl_db = 8.685890 * math.log(2.0 * wn * prop["dist"])
+            zc = qerfi([qc / 100.0])[0]
+
+            quantiles: list[PathLossQuantile] = []
+            for q_pct in sorted(qr_list):
+                zr = qerfi([q_pct / 100.0])[0]
+                prop["lvar"] = 5
+                avar1, prop = avar(zr, 0.0, zc, prop)
+                quantiles.append(
+                    PathLossQuantile(
+                        reliability_pct=float(q_pct),
+                        confidence_pct=qc,
+                        loss_db=round(float(fspl_db + avar1), 2),
+                    )
                 )
-                for q_pct, loss in out["quantiles"].items()
-            ]
+            return quantiles
         except Exception:
             return None

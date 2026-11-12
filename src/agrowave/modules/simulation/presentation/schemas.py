@@ -22,6 +22,18 @@ class UpdateSimulationRequest(BaseModel):
     description: str | None = Field(default=None, max_length=500)
 
 
+class CoverageMetricsResponse(BaseModel):
+    """Consolidated DSR quantitative evaluation metrics (RN-44..47)."""
+
+    effective_coverage_area_km2: float
+    coverage_percentage: float
+    max_coverage_radius_km: float
+    variability_index: float
+    total_area_km2: float
+    covered_samples_count: int
+    total_samples_count: int
+
+
 class SimulationSummaryResponse(BaseModel):
     """Aggregated summary metrics for a completed simulation."""
 
@@ -31,6 +43,7 @@ class SimulationSummaryResponse(BaseModel):
     fresnel_clear_count: int
     fresnel_marginal_count: int
     fresnel_obstructed_count: int
+    coverage_metrics: CoverageMetricsResponse | None = None
 
 
 class FresnelAnalysisResponse(BaseModel):
@@ -115,11 +128,59 @@ class SimulationResponse(BaseModel):
     finished_at: datetime | None
 
 
+class CoverageSampleResponse(BaseModel):
+    """Spatial coverage sample point."""
+
+    latitude: float
+    longitude: float
+    distance_m: float
+    azimuth_deg: float
+    received_power_dbm: float
+    viable: bool
+    cell_area_km2: float
+
+
+class CoverageResultResponse(BaseModel):
+    """Coverage simulation result with samples and consolidated DSR metrics."""
+
+    id: UUID
+    access_node_id: UUID
+    metrics: CoverageMetricsResponse
+    samples: list[CoverageSampleResponse]
+
+
 class SimulationResultsResponse(SimulationResponse):
-    """Full simulation detail including per-link results, profiles, and warnings."""
+    """Full simulation detail including per-link results, profiles, warnings, and coverage."""
 
     link_results: list[LinkResultResponse]
     warnings: list[SimulationWarningResponse]
+    coverage_result: CoverageResultResponse | None = None
+
+
+class CoverageExportRow(BaseModel):
+    """Format matching Radio Mobile Cartesian/Polar export structure."""
+
+    latitude: float
+    longitude: float
+    received_power_dbm: float
+    viable: bool
+    distance_km: float
+    azimuth_deg: float
+
+
+class CoverageExportResponse(BaseModel):
+    """Export package containing metadata, DSR metrics, and grid/radial samples."""
+
+    simulation_id: UUID
+    simulation_name: str
+    technology: str
+    frequency_mhz: float
+    access_node_name: str
+    access_node_lat: float
+    access_node_lon: float
+    sensitivity_dbm: float
+    metrics: CoverageMetricsResponse
+    samples: list[CoverageExportRow]
 
 
 class ComparedSimulationSummaryResponse(BaseModel):

@@ -9,6 +9,7 @@ from agrowave.modules.scenarios.domain.ports import ScenarioRepository
 from agrowave.modules.scenarios.presentation.dependencies import get_scenario_repository
 from agrowave.modules.scenarios.public import ScenariosService
 from agrowave.modules.simulation.domain.ports import (
+    CoverageEnginePort,
     PropagationEngine,
     ScenarioSnapshotSource,
     SimulationJobRunner,
@@ -21,6 +22,9 @@ from agrowave.modules.simulation.infrastructure.adapters import (
 )
 from agrowave.modules.simulation.infrastructure.itm_propagation_engine import (
     ItmLongleyRiceEngine,
+)
+from agrowave.modules.simulation.infrastructure.polar_sweep_engine import (
+    PolarSweepCoverageEngine,
 )
 from agrowave.modules.simulation.infrastructure.rasterio_profile_provider import (
     RasterioTerrainProfileProvider,
@@ -69,10 +73,16 @@ def get_propagation_engine() -> PropagationEngine:
     return ItmLongleyRiceEngine()
 
 
+def get_coverage_engine() -> CoverageEnginePort:
+    """Provides the polar sweep spatial coverage engine adapter (RN-48)."""
+    return PolarSweepCoverageEngine()
+
+
 def get_simulation_job_runner(
     engine: Engine = Depends(get_simulation_engine),
     profile_provider: TerrainProfileProvider = Depends(get_terrain_profile_provider),
     propagation_engine: PropagationEngine = Depends(get_propagation_engine),
+    coverage_engine: CoverageEnginePort = Depends(get_coverage_engine),
 ) -> SimulationJobRunner:
     """Provides the background simulation job runner."""
     is_sqlite = str(engine.url).startswith("sqlite")
@@ -80,5 +90,6 @@ def get_simulation_job_runner(
         engine=engine,
         profile_provider=profile_provider,
         propagation_engine=propagation_engine,
+        coverage_engine=coverage_engine,
         run_synchronously=is_sqlite,
     )

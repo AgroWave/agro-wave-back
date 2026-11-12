@@ -511,3 +511,65 @@ def test_ac05_01_authorization_and_ownership_isolation(client: TestClient) -> No
         client.delete(f"/api/v1/simulations/{sim_a['id']}", headers=headers_b).status_code
         == status.HTTP_404_NOT_FOUND
     )
+
+
+def test_ac29_export_coverage_data_for_radio_mobile(client: TestClient) -> None:
+    """AC-29: Export coverage data in Radio Mobile compatible format (UC-CO-04)."""
+    token, user_id = _create_authenticated_user(client, "ac29@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    engine = client.app.dependency_overrides.get(list(client.app.dependency_overrides.keys())[0])()
+    seeded = _seed_profiles_and_dem(engine, user_id, dem_status="AVAILABLE")
+
+    client.app.dependency_overrides[get_terrain_profile_provider] = _FakeTerrainProfileProvider
+    client.app.dependency_overrides[get_propagation_engine] = _FakePropagationEngine
+
+    scenario = _create_valid_scenario(client, headers, seeded["dem_id"], seeded["lora_id"])
+
+    create_res = client.post(
+        "/api/v1/simulations",
+        headers=headers,
+        json={
+            "scenario_id": scenario["id"],
+            "name": "Sim For Export",
+            "description": "Radio Mobile comparison export",
+        },
+    )
+    assert create_res.status_code == status.HTTP_201_CREATED
+    sim_id = create_res.json()["id"]
+
+    # Before running -> 409
+    export_before_run = client.get(
+        f"/api/v1/simulations/{sim_id}/coverage/export",
+        headers=headers,
+    )
+    assert export_before_run.status_code == status.HTTP_409_CONFLICT
+
+    # Run simulation
+    run_res = client.post(
+        f"/api/v1/simulations/{sim_id}/run",
+        headers=headers,
+    )
+    assert run_res.status_code == status.HTTP_202_ACCEPTED
+
+    # Export coverage data -> 200 OK
+    export_res = client.get(
+        f"/api/v1/simulations/{sim_id}/coverage/export",
+        headers=headers,
+    )
+    assert export_res.status_code == status.HTTP_200_OK
+    data = export_res.json()
+    assert data["simulation_id"] == sim_id
+    assert data["technology"] == "LORAWAN"
+    assert "metrics" in data
+    assert data["metrics"]["effective_coverage_area_km2"] >= 0.0
+    assert data["metrics"]["coverage_percentage"] >= 0.0
+    assert data["metrics"]["max_coverage_radius_km"] >= 0.0
+    assert data["metrics"]["variability_index"] >= 0.0
+    assert len(data["samples"]) > 0
+    first_sample = data["samples"][0]
+    assert "latitude" in first_sample
+    assert "longitude" in first_sample
+    assert "received_power_dbm" in first_sample
+    assert "viable" in first_sample
+    assert "distance_km" in first_sample
+    assert "azimuth_deg" in first_sample
